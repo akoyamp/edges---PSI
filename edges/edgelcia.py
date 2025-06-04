@@ -867,7 +867,10 @@ class EdgeLCIA:
             )
 
             grouped_edges = group_edges_by_signature(
-                edge_list=remaining_edges,
+                edge_list=[
+                    (supplier_idx, consumer_idx, supplier_info, consumer_info)
+                    for (supplier_idx, consumer_idx, supplier_info, consumer_info, _) in remaining_edges
+                ],
                 required_supplier_fields=self.required_supplier_fields,
                 required_consumer_fields=self.required_consumer_fields,
                 geo=self.geo,
@@ -951,8 +954,8 @@ class EdgeLCIA:
         decomposed_exclusions = self.geo.batch(
             locations=list(raw_exclusion_locs), containing=True
         )
-
-        for direction in ["biosphere-technosphere", "technosphere-technosphere"]:
+        #for direction in ["biosphere-technosphere", "technosphere-technosphere"]:
+        for direction in ["technosphere-technosphere"]:
             unprocessed_edges = (
                 self.unprocessed_biosphere_edges
                 if direction == "biosphere-technosphere"
@@ -967,7 +970,9 @@ class EdgeLCIA:
             processed_flows = set(processed_flows)
             prefiltered_groups = defaultdict(list)
             remaining_edges = []
-
+            print(f"Processing {len(unprocessed_edges)} unprocessed edges in {direction} direction...")
+            counter, incounter = 0, 0
+            # Iterate over unprocessed edges
             for supplier_idx, consumer_idx in unprocessed_edges:
                 if (supplier_idx, consumer_idx) in processed_flows:
                     continue
@@ -1001,7 +1006,7 @@ class EdgeLCIA:
                     containing=True,
                     exceptions=excluded_subregions,
                 )
-
+                
                 if sig in candidate_supplier_keys:
                     prefiltered_groups[sig].append(
                         (
@@ -1013,7 +1018,9 @@ class EdgeLCIA:
                         )
                     )
                 else:
+                    counter += 1
                     if any(op in cf_operators for op in ["contains", "startswith"]):
+                        incounter += 1
                         remaining_edges.append(
                             (
                                 supplier_idx,
@@ -1024,7 +1031,8 @@ class EdgeLCIA:
                                 candidate_consumers,
                             )
                         )
-
+            print(f"Counter: {counter}, InCounter: {incounter}")
+            print(f"Remaining edges after prefiltering: {len(remaining_edges)}")
             # Pass 1
             for sig, group_edges in tqdm(
                 prefiltered_groups.items(), desc="Processing dynamic groups (pass 1)"
@@ -1073,7 +1081,10 @@ class EdgeLCIA:
             )
 
             grouped_edges = group_edges_by_signature(
-                edge_list=remaining_edges,
+                edge_list=[
+                    (supplier_idx, consumer_idx, supplier_info, consumer_info)
+                    for (supplier_idx, consumer_idx, supplier_info, consumer_info, _, _) in remaining_edges
+                ],
                 required_supplier_fields=self.required_supplier_fields,
                 required_consumer_fields=self.required_consumer_fields,
                 geo=self.geo,
@@ -1416,7 +1427,10 @@ class EdgeLCIA:
             )
 
             grouped_edges = group_edges_by_signature(
-                edge_list=remaining_edges,
+                edge_list=[
+                    (supplier_idx, consumer_idx, supplier_info, consumer_info)
+                    for (supplier_idx, consumer_idx, supplier_info, consumer_info, _,_) in remaining_edges
+                ],
                 required_supplier_fields=self.required_supplier_fields,
                 required_consumer_fields=self.required_consumer_fields,
                 geo=self.geo,

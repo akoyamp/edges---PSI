@@ -506,13 +506,13 @@ def group_edges_by_signature(
     edge_list, required_supplier_fields, required_consumer_fields, geo, weights
 ):
     grouped = defaultdict(list)
-
+    print("The length of Entered edge list is: %s", len(edge_list))
     for (
         supplier_idx,
         consumer_idx,
         supplier_info,
         consumer_info,
-        candidate_locs,
+        
     ) in edge_list:
         s_filtered = normalize_signature_data(supplier_info, required_supplier_fields)
         c_filtered = normalize_signature_data(consumer_info, required_consumer_fields)
