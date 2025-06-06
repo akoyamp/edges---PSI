@@ -9,6 +9,7 @@ from edges.utils import safe_eval
 
 import hashlib
 
+
 def get_rng_for_key(key: str, base_seed: int) -> np.random.Generator:
     key_digest = int(hashlib.sha256(key.encode()).hexdigest(), 16) % (2**32)
     return np.random.default_rng(base_seed + key_digest)
@@ -24,6 +25,7 @@ def make_distribution_key(cf):
     else:
         # No uncertainty block → return None = skip caching
         return None
+
 
 def sample_cf_distribution(
     cf: dict,
