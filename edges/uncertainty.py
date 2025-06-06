@@ -3,9 +3,27 @@ This module contains the Uncertainty class, which is responsible for handling
 """
 
 import numpy as np
+import json
 from scipy import stats
 from edges.utils import safe_eval
 
+import hashlib
+
+def get_rng_for_key(key: str, base_seed: int) -> np.random.Generator:
+    key_digest = int(hashlib.sha256(key.encode()).hexdigest(), 16) % (2**32)
+    return np.random.default_rng(base_seed + key_digest)
+
+
+def make_distribution_key(cf):
+    """Generate a hashable cache key for CF uncertainty sampling."""
+    unc = cf.get("uncertainty")
+    if unc:
+        unc_copy = dict(unc)  # shallow copy
+        unc_copy.pop("negative", None)  # remove if present
+        return json.dumps(unc_copy, sort_keys=True)
+    else:
+        # No uncertainty block → return None = skip caching
+        return None
 
 def sample_cf_distribution(
     cf: dict,
@@ -108,4 +126,4 @@ def sample_cf_distribution(
     else:
         samples = np.full(n, cf["value"], dtype=float)
 
-    return -samples if negative else samples
+    return samples

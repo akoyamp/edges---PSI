@@ -39,12 +39,11 @@ from .flow_matching import (
     build_index,
     compute_cf_memoized_factory,
     resolve_candidate_consumers,
-    normalize_signature_data,
     group_edges_by_signature,
     compute_average_cf,
 )
 from .georesolver import GeoResolver
-from .uncertainty import sample_cf_distribution
+from .uncertainty import sample_cf_distribution, make_distribution_key, get_rng_for_key
 from .filesystem_constants import DATA_DIR
 
 # delete the logs
@@ -1498,16 +1497,41 @@ class EdgeLCIA:
         if self.use_distributions and self.iterations > 1:
             coords_i, coords_j, coords_k = [], [], []
             data = []
+            sample_cache = {}
 
             for cf in self.cfs_mapping:
-                samples = sample_cf_distribution(
-                    cf=cf,
-                    n=self.iterations,
-                    parameters=self.parameters,
-                    random_state=self.random_state,
-                    use_distributions=self.use_distributions,
-                    SAFE_GLOBALS=self.SAFE_GLOBALS,
-                )
+
+                # Build a hashable key that uniquely identifies
+                # the distribution definition
+                key = make_distribution_key(cf)
+
+                if key is None:
+                    samples = sample_cf_distribution(
+                        cf=cf,
+                        n=self.iterations,
+                        parameters=self.parameters,
+                        random_state=self.random_state,  # can reuse global RNG
+                        use_distributions=self.use_distributions,
+                        SAFE_GLOBALS=self.SAFE_GLOBALS,
+                    )
+                elif key in sample_cache:
+                    samples = sample_cache[key]
+                else:
+                    rng = get_rng_for_key(key, self.random_seed)
+                    samples = sample_cf_distribution(
+                        cf=cf,
+                        n=self.iterations,
+                        parameters=self.parameters,
+                        random_state=rng,
+                        use_distributions=self.use_distributions,
+                        SAFE_GLOBALS=self.SAFE_GLOBALS,
+                    )
+                    sample_cache[key] = samples
+
+                neg = (cf.get("uncertainty") or {}).get("negative", 0)
+                if neg == 1:
+                    samples = -samples
+
                 for i, j in cf["positions"]:
                     for k in range(self.iterations):
                         coords_i.append(i)
@@ -1524,8 +1548,17 @@ class EdgeLCIA:
                 else self.lca.technosphere_matrix.shape
             )
 
+            # Sort all (i, j, k) indices to ensure consistent iteration ordering
+            coords = np.array([coords_i, coords_j, coords_k])
+            data = np.array(data)
+
+            # Lexicographic sort by i, j, k
+            order = np.lexsort((coords[2], coords[1], coords[0]))
+            coords = coords[:, order]
+            data = data[order]
+
             self.characterization_matrix = sparse.COO(
-                coords=[coords_i, coords_j, coords_k],
+                coords=coords,
                 data=data,
                 shape=(n_rows, n_cols, self.iterations),
             )
