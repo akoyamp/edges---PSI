@@ -234,7 +234,11 @@ def build_cf_index(
 
         supplier = cf.get("supplier", {})
         sig = tuple(
-            sorted((k, supplier[k]) for k in required_supplier_fields if k in supplier)
+            sorted(
+                (k, make_hashable(supplier[k]))
+                for k in required_supplier_fields
+                if k in supplier
+            )
         )
 
         index[consumer_loc][sig].append(cf)

@@ -27,6 +27,7 @@ from .utils import (
     validate_parameter_lengths,
     get_str,
     make_hashable,
+    assert_no_nans_in_cf_list,
 )
 from .matrix_builders import initialize_lcia_matrix, build_technosphere_edges_matrix
 from .flow_matching import (
@@ -232,6 +233,8 @@ class EdgeLCIA:
 
         # Store full method metadata except exchanges and parameters
         self.raw_cfs_data, self.method_metadata = format_data(raw, self.weight)
+        # check for NaNs in the raw CF data
+        assert_no_nans_in_cf_list(self.raw_cfs_data, file_source=self.filepath)
         self.raw_cfs_data = normalize_classification_entries(self.raw_cfs_data)
         self.cfs_number = len(self.raw_cfs_data)
 
@@ -252,7 +255,7 @@ class EdgeLCIA:
             k
             for cf in self.raw_cfs_data
             for k in cf["supplier"].keys()
-            if k not in {"matrix", "operator", "weight", "position"}
+            if k not in {"matrix", "operator", "weight", "position", "excludes"}
         }
 
         self.cf_index = build_cf_index(self.raw_cfs_data, self.required_supplier_fields)
@@ -419,7 +422,7 @@ class EdgeLCIA:
         """
 
         # Constants for ignored fields
-        IGNORED_FIELDS = {"matrix", "operator", "weight", "classifications"}
+        IGNORED_FIELDS = {"matrix", "operator", "weight", "classifications", "excludes"}
 
         self.required_consumer_fields = {
             k
@@ -623,7 +626,7 @@ class EdgeLCIA:
             if not any(
                 k
                 for k in consumer_criteria
-                if k not in {"matrix", "weight", "position"}
+                if k not in {"matrix", "weight", "position", "excludes"}
             ):
                 consumer_candidates = list(self.consumer_lookup.values())
                 consumer_candidates = [
@@ -639,6 +642,7 @@ class EdgeLCIA:
                     make_hashable(consumer_criteria),
                     tuple(sorted(self.required_consumer_fields)),
                 )
+
 
             # --- Combine supplier + consumer ---
             positions = [
@@ -1805,7 +1809,7 @@ class EdgeLCIA:
 
         print(table)
 
-    def generate_cf_table(self) -> pd.DataFrame:
+    def generate_cf_table(self, include_unmatched=False) -> pd.DataFrame:
         """
         Generate a detailed results table of characterized exchanges.
 
@@ -1940,6 +1944,41 @@ class EdgeLCIA:
                         entry["supplier location"] = supplier.get("location")
 
                     data.append(entry)
+
+        if include_unmatched is True:
+            unprocess_exchanges = (
+                self.unprocessed_biosphere_edges
+                if is_biosphere
+                else self.unprocessed_technosphere_edges
+            )
+            # Add unprocessed exchanges
+            for i, j in unprocess_exchanges:
+                consumer = bw2data.get_activity(self.reversed_activity[j])
+                supplier = bw2data.get_activity(self.reversed_activity[i])
+
+                amount = inventory[i, j]
+                cf_value = None
+                impact = None
+
+                entry = {
+                    "supplier name": supplier["name"],
+                    "consumer name": consumer["name"],
+                    "consumer reference product": consumer.get("reference product"),
+                    "consumer location": consumer.get("location"),
+                    "amount": amount,
+                    "CF": cf_value,
+                    "impact": impact,
+                }
+
+                if is_biosphere:
+                    entry["supplier categories"] = supplier.get("categories")
+                else:
+                    entry["supplier reference product"] = supplier.get(
+                        "reference product"
+                    )
+                    entry["supplier location"] = supplier.get("location")
+
+                data.append(entry)
 
         # Convert to DataFrame
         df = pd.DataFrame(data)
