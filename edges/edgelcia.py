@@ -643,7 +643,6 @@ class EdgeLCIA:
                     tuple(sorted(self.required_consumer_fields)),
                 )
 
-
             # --- Combine supplier + consumer ---
             positions = [
                 (supplier, consumer)
