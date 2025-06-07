@@ -60,52 +60,21 @@ def process_cf_list(
     for cf in cf_list:
         supplier_cf = cf.get("supplier", {})
         consumer_cf = cf.get("consumer", {})
-        operator = supplier_cf.get("operator", "equals")
 
-        supplier_match = True
-        for k in filtered_supplier:
-            if k == "classifications":
-                continue
-            val = filtered_supplier.get(k, "")
-            expected = supplier_cf.get(k, "")
-
-            if k == "location" and candidate_suppliers:
-                match = any(
-                    match_operator(loc_val, expected, operator)
-                    for loc_val in candidate_suppliers
-                )
-            else:
-                match = match_operator(val, expected, operator)
-
-            if not match:
-                supplier_match = False
-                break
+        supplier_match = match_flow(
+            flow=supplier_info,
+            criteria=supplier_cf,
+            candidate_locations=candidate_suppliers,
+        )
 
         if not supplier_match:
             continue
 
-        consumer_match = True
-        for k in filtered_consumer:
-            if k == "classifications":
-                continue
-
-            if k not in consumer_cf:
-                continue  # Missing field in CF means match anything
-
-            val = filtered_consumer.get(k, "")
-            expected = consumer_cf.get(k, "")
-
-            if k == "location" and candidate_consumers:
-                match = any(
-                    match_operator(loc_val, expected, operator)
-                    for loc_val in candidate_consumers
-                )
-            else:
-                match = match_operator(val, expected, operator)
-
-            if not match:
-                consumer_match = False
-                break
+        consumer_match = match_flow(
+            flow=consumer_info,
+            criteria=consumer_cf,
+            candidate_locations=candidate_consumers,
+        )
 
         if not consumer_match:
             continue
@@ -165,6 +134,45 @@ def matches_classifications(cf_classifications, dataset_classifications):
         ):
             return True
     return False
+
+
+def match_flow(
+    flow: dict, criteria: dict, candidate_locations: list[str] = None
+) -> bool:
+    operator = criteria.get("operator", "equals")
+    excludes = criteria.get("excludes", [])
+
+    # Handle excludes
+    if excludes:
+        for val in flow.values():
+            if isinstance(val, str) and any(
+                term.lower() in val.lower() for term in excludes
+            ):
+                return False
+            elif isinstance(val, tuple):
+                if any(
+                    term.lower() in str(v).lower() for v in val for term in excludes
+                ):
+                    return False
+
+    # Handle standard field matching
+    for key, target in criteria.items():
+        if key in {"matrix", "operator", "weight", "position", "excludes"}:
+            continue
+
+        value = flow.get(key)
+
+        if key == "location" and candidate_locations is not None:
+            if not any(
+                match_operator(loc_val.get("location", ""), target, operator)
+                for loc_val in candidate_locations
+                if isinstance(loc_val, dict)
+            ):
+                return False
+        elif value is None or not match_operator(value, target, operator):
+            return False
+
+    return True
 
 
 @cache
@@ -337,7 +345,6 @@ def match_with_index(
     :param required_fields: The required fields for matching.
     :return: A list of matching positions.
     """
-    operator_value = flow_to_match.get("operator", "equals")
     candidate_keys = None
 
     if not required_fields:
@@ -345,7 +352,11 @@ def match_with_index(
         return [pos for positions in lookup_mapping.values() for pos in positions]
 
     for field in required_fields:
+        if field == "excludes":
+            continue
+
         match_target = flow_to_match.get(field)
+        operator_value = flow_to_match.get("operator", "equals")
         field_index = index.get(field, {})
         field_candidates = set()
 
@@ -377,7 +388,11 @@ def match_with_index(
     # Gather positions from the original lookup mapping for all candidate keys.
     matches = []
     for key in candidate_keys:
-        matches.extend(lookup_mapping.get(key, []))
+        for pos in lookup_mapping.get(key, []):
+            raw = reversed_lookup.get(pos)
+            flow = dict(raw) if isinstance(raw, tuple) else raw
+            if flow and match_flow(flow, flow_to_match):
+                matches.append(pos)
 
     if "classifications" in flow_to_match:
         cf_classifications_by_scheme = flow_to_match["classifications"]
@@ -392,11 +407,7 @@ def match_with_index(
             flow = dict(flow)
             if not flow:
                 continue
-            try:
-                dataset_classifications = flow.get("classifications", [])
-            except:
-                print(flow)
-                raise
+            dataset_classifications = flow.get("classifications", [])
 
             if dataset_classifications:
                 for scheme, cf_codes in cf_classifications_by_scheme.items():

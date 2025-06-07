@@ -20,6 +20,7 @@ from tqdm import tqdm
 from textwrap import fill
 from functools import lru_cache
 
+
 from .utils import (
     format_data,
     get_flow_matrix_positions,
@@ -422,7 +423,7 @@ class EdgeLCIA:
         """
 
         # Constants for ignored fields
-        IGNORED_FIELDS = {"matrix", "operator", "weight", "classifications", "excludes"}
+        IGNORED_FIELDS = {"matrix", "operator", "weight", "classifications"}
 
         self.required_consumer_fields = {
             k

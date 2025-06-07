@@ -12,6 +12,7 @@ from functools import reduce, cache
 import operator
 import hashlib
 import json
+import math
 
 from bw2data import __version__ as bw2data_version
 
