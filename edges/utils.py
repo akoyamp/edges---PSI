@@ -452,19 +452,25 @@ def make_hashable(value):
 
 
 @cache
-def get_shares(candidates: tuple):
+def get_shares(candidates: list):
     """
     Get the shares of each candidate location based on weights.
     """
     if not candidates:
         return [], np.array([])
 
-    cand_locs, weights = zip(*candidates)
+    cand_supplier_locs, cand_consumer_locs , weights = zip(*candidates)
+
     weight_array = np.array(weights, dtype=float)
     total_weight = weight_array.sum()
     if total_weight == 0:
-        return list(cand_locs), np.zeros_like(weight_array)
-    return list(cand_locs), weight_array / total_weight
+        return [
+            (cand_supplier_locs, cand_consumer_locs, 0.0)
+        ]
+    return [
+        (cand_supplier_locs, cand_consumer_locs, weight / total_weight)
+        for weight in weight_array
+    ]
 
 
 def assert_no_nans_in_cf_list(cf_list: list[dict], file_source: str = "<input>"):
@@ -475,5 +481,5 @@ def assert_no_nans_in_cf_list(cf_list: list[dict], file_source: str = "<input>")
                 if isinstance(v, float) and math.isnan(v):
                     raise ValueError(
                         f"NaN detected in {side} field '{k}' of CF at index {i} "
-                        f"in {file_source}. This field must be removed or filled."
+                        f"in {file_source}: {entry}. This field must be removed or filled."
                     )
