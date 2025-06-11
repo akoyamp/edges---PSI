@@ -657,7 +657,6 @@ class EdgeLCIA:
             else:
                 supplier_candidates = nonclass_matches
 
-
             # --- Consumer matching ---
             # Step 1: Classifications filter
             if "classifications" in consumer_criteria:
@@ -957,7 +956,6 @@ class EdgeLCIA:
                 new_cf, matched_cf_obj = compute_cf_memoized(
                     s_key, c_key, candidate_suppliers, candidate_consumers
                 )
-
 
                 if new_cf != 0:
                     for supplier_idx, consumer_idx in edge_group:
@@ -1540,7 +1538,9 @@ class EdgeLCIA:
                     candidate_suppliers_locations = global_locations
 
                 if consumer_location is None:
-                    candidate_consumers_locations = ["__ANY__",]
+                    candidate_consumers_locations = [
+                        "__ANY__",
+                    ]
                 else:
                     candidate_consumers_locations = global_locations
 

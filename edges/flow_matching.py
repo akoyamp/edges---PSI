@@ -364,7 +364,9 @@ def match_with_index(
             else:
                 for candidate_value, candidate_list in field_index.items():
                     if match_operator(
-                        value=candidate_value, target=match_target, operator=operator_value
+                        value=candidate_value,
+                        target=match_target,
+                        operator=operator_value,
                     ):
                         for candidate in candidate_list:
                             candidate_key, _ = candidate
