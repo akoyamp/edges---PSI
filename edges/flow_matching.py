@@ -155,6 +155,9 @@ def match_flow(
 
         value = flow.get(key)
 
+        if target == "__ANY__":
+            continue
+
         if value is None or not match_operator(value, target, operator):
             return False
 
@@ -174,6 +177,9 @@ def match_operator(value: str, target: str, operator: str) -> bool:
     :param operator: The operator type ("equals", "startswith", "contains").
     :return: True if the condition is met, False otherwise.
     """
+    if target == "__ANY__":
+        return True
+
     if operator == "equals":
         return value == target
     elif operator == "startswith":
@@ -330,28 +336,42 @@ def match_with_index(
         return [pos for positions in lookup_mapping.values() for pos in positions]
 
     for field in required_fields:
-        if field == "excludes":
+
+        if field in ("excludes", "operator", "matrix"):
             continue
 
         match_target = flow_to_match.get(field)
+
         operator_value = flow_to_match.get("operator", "equals")
         field_index = index.get(field, {})
         field_candidates = set()
 
         if operator_value == "equals":
             # Fast direct lookup.
-            for candidate in field_index.get(match_target, []):
-                candidate_key, _ = candidate
-                field_candidates.add(candidate_key)
-        else:
-            # For "startswith" or "contains", we iterate over all candidate values.
-            for candidate_value, candidate_list in field_index.items():
-                if match_operator(
-                    value=candidate_value, target=match_target, operator=operator_value
-                ):
+            if match_target == "__ANY__":
+                for candidate_value, candidate_list in field_index.items():
                     for candidate in candidate_list:
                         candidate_key, _ = candidate
                         field_candidates.add(candidate_key)
+            else:
+                for candidate in field_index.get(match_target, []):
+                    candidate_key, _ = candidate
+                    field_candidates.add(candidate_key)
+        else:
+            # For "startswith" or "contains", we iterate over all candidate values.
+            if match_target == "__ANY__":
+                for candidate_value, candidate_list in field_index.items():
+                    for candidate in candidate_list:
+                        candidate_key, _ = candidate
+                        field_candidates.add(candidate_key)
+            else:
+                for candidate_value, candidate_list in field_index.items():
+                    if match_operator(
+                        value=candidate_value, target=match_target, operator=operator_value
+                    ):
+                        for candidate in candidate_list:
+                            candidate_key, _ = candidate
+                            field_candidates.add(candidate_key)
 
         # Initialize or intersect candidate sets.
         if candidate_keys is None:
@@ -366,8 +386,8 @@ def match_with_index(
     # Gather positions from the original lookup mapping for all candidate keys.
     matches = []
     for key in candidate_keys:
-        for pos in lookup_mapping.get(key, []):
-            raw = reversed_lookup.get(pos)
+        for pos in lookup_mapping[key]:
+            raw = reversed_lookup[pos]
             flow = dict(raw) if isinstance(raw, tuple) else raw
             if flow and match_flow(flow, flow_to_match):
                 matches.append(pos)

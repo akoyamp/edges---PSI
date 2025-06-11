@@ -610,6 +610,7 @@ class EdgeLCIA:
             supplier_criteria = cf["supplier"]
             consumer_criteria = cf["consumer"]
 
+            # --- Supplier matching ---
             # Step 1: Classifications filter
             if "classifications" in supplier_criteria:
                 cf_class = supplier_criteria["classifications"]
@@ -656,26 +657,53 @@ class EdgeLCIA:
             else:
                 supplier_candidates = nonclass_matches
 
+
             # --- Consumer matching ---
-            if not any(
-                k
-                for k in consumer_criteria
-                if k not in {"matrix", "weight", "position", "excludes"}
-            ):
-                consumer_candidates = list(self.consumer_lookup.values())
-                consumer_candidates = [
-                    pos for sublist in consumer_candidates for pos in sublist
+            # Step 1: Classifications filter
+            if "classifications" in consumer_criteria:
+                cf_class = consumer_criteria["classifications"]
+                classification_matches = [
+                    idx
+                    for idx in self.reversed_consumer_lookup
+                    if matches_classifications(
+                        cf_class,
+                        dict(self.reversed_consumer_lookup[idx]).get(
+                            "classifications", []
+                        ),
+                    )
                 ]
             else:
-                cached_match_with_index.index = consumer_index
-                cached_match_with_index.lookup_mapping = self.consumer_lookup
-                cached_match_with_index.reversed_lookup = (
-                    self.position_to_technosphere_flows_lookup
+                classification_matches = None
+
+            # Step 2: Other filters (location, name, etc.)
+            cached_match_with_index.index = consumer_index
+            cached_match_with_index.lookup_mapping = self.consumer_lookup
+            cached_match_with_index.reversed_lookup = self.reversed_consumer_lookup
+
+            nonclass_criteria = {
+                k: v for k, v in consumer_criteria.items() if k != "classifications"
+            }
+
+            nonclass_matches = cached_match_with_index(
+                make_hashable(nonclass_criteria),
+                tuple(
+                    sorted(
+                        {
+                            k
+                            for k in self.required_consumer_fields
+                            if k != "classifications"
+                        }
+                    )
+                ),
+            )
+
+            # Step 3: Combine
+            if classification_matches is not None:
+                consumer_candidates = list(
+                    set(classification_matches) & set(nonclass_matches)
                 )
-                consumer_candidates = cached_match_with_index(
-                    make_hashable(consumer_criteria),
-                    tuple(sorted(self.required_consumer_fields)),
-                )
+            else:
+                consumer_candidates = nonclass_matches
 
             # --- Combine supplier + consumer ---
             positions = [
@@ -917,6 +945,7 @@ class EdgeLCIA:
                 new_cf, matched_cf_obj = compute_cf_memoized(
                     s_key, c_key, candidate_suppliers, candidate_consumers
                 )
+
 
                 if new_cf != 0:
                     for supplier_idx, consumer_idx in edge_group:
@@ -1475,7 +1504,10 @@ class EdgeLCIA:
                 else:
                     candidate_suppliers_locations = global_locations
 
-                candidate_consumer_locations = global_locations
+                if consumer_location is None:
+                    candidate_consumers_locations = ["__ANY__",]
+                else:
+                    candidate_consumers_locations = global_locations
 
                 for supplier_idx, consumer_idx in edges:
 
@@ -1492,7 +1524,7 @@ class EdgeLCIA:
                                 supplier_info,
                                 consumer_info,
                                 candidate_suppliers_locations,
-                                candidate_consumer_locations,
+                                candidate_consumers_locations,
                             )
                         )
                     else:
@@ -1504,7 +1536,7 @@ class EdgeLCIA:
                                     supplier_info,
                                     consumer_info,
                                     candidate_suppliers_locations,
-                                    candidate_consumer_locations,
+                                    candidate_consumers_locations,
                                 )
                             )
                         else:
