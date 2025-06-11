@@ -800,20 +800,23 @@ class EdgeLCIA:
                     "location"
                 )
 
-                edges_index[(consumer_loc, supplier_loc)].append((supplier_idx, consumer_idx))
+                edges_index[(consumer_loc, supplier_loc)].append(
+                    (supplier_idx, consumer_idx)
+                )
 
             prefiltered_groups = defaultdict(list)
             remaining_edges = []
 
             for (consumer_location, supplier_location), edges in edges_index.items():
                 if any(
-                    x in ("RoW", "RoE")
-                    for x in (consumer_location, supplier_location)
+                    x in ("RoW", "RoE") for x in (consumer_location, supplier_location)
                 ):
                     continue
 
                 if supplier_location is None:
-                    candidate_suppliers_locations = ["__ANY__",]
+                    candidate_suppliers_locations = [
+                        "__ANY__",
+                    ]
                 else:
                     # 🔁 Use the shared utility function to get subregions
                     candidate_suppliers_locations = resolve_candidate_locations(
@@ -821,27 +824,36 @@ class EdgeLCIA:
                         location=supplier_location,
                         weights=frozenset(k for k, v in self.weights.items()),
                         containing=True,
-                        supplier=True
+                        supplier=True,
                     )
 
                 if len(candidate_suppliers_locations) == 0:
-                    candidate_suppliers_locations = [supplier_location,]
+                    candidate_suppliers_locations = [
+                        supplier_location,
+                    ]
 
                 if consumer_location is None:
-                    candidate_consumer_locations = ["__ANY__",]
+                    candidate_consumer_locations = [
+                        "__ANY__",
+                    ]
                 else:
                     candidate_consumer_locations = resolve_candidate_locations(
                         geo=self.geo,
                         location=consumer_location,
                         weights=frozenset(k for k, v in self.weights.items()),
                         containing=True,
-                        supplier=False
+                        supplier=False,
                     )
 
                 if len(candidate_consumer_locations) == 0:
-                    candidate_consumer_locations = [consumer_location,]
+                    candidate_consumer_locations = [
+                        consumer_location,
+                    ]
 
-                if len(candidate_suppliers_locations) == 1 and len(candidate_consumer_locations) == 1:
+                if (
+                    len(candidate_suppliers_locations) == 1
+                    and len(candidate_consumer_locations) == 1
+                ):
                     # neither the supplier or consumer locations are composite locations
                     continue
 
@@ -908,7 +920,7 @@ class EdgeLCIA:
                         supplier_info,
                         consumer_info,
                         _,
-                        _
+                        _,
                     ) in group_edges:
                         add_cf_entry(
                             cfs_mapping=self.cfs_mapping,
@@ -1073,11 +1085,11 @@ class EdgeLCIA:
                     )
                 else:
                     if supplier_loc is None:
-                        candidate_suppliers_locs = ["__ANY__",]
-                    else:
                         candidate_suppliers_locs = [
-                            supplier_loc
+                            "__ANY__",
                         ]
+                    else:
+                        candidate_suppliers_locs = [supplier_loc]
 
                 if dynamic_consumer:
                     candidate_consumers_locs = resolve_candidate_locations(
@@ -1089,11 +1101,11 @@ class EdgeLCIA:
                     )
                 else:
                     if consumer_loc is None:
-                        candidate_consumers_locs = ["__ANY__",]
-                    else:
                         candidate_consumers_locs = [
-                            consumer_loc
+                            "__ANY__",
                         ]
+                    else:
+                        candidate_consumers_locs = [consumer_loc]
 
                 sig = self._equality_supplier_signature(supplier_info)
                 if sig in candidate_supplier_keys:
@@ -1104,7 +1116,7 @@ class EdgeLCIA:
                             supplier_info,
                             consumer_info,
                             candidate_suppliers_locs,
-                            candidate_consumers_locs
+                            candidate_consumers_locs,
                         )
                     )
                 else:
@@ -1116,7 +1128,7 @@ class EdgeLCIA:
                                 supplier_info,
                                 consumer_info,
                                 candidate_suppliers_locs,
-                                candidate_consumers_locs
+                                candidate_consumers_locs,
                             )
                         )
 
@@ -1174,11 +1186,18 @@ class EdgeLCIA:
                 required_consumer_fields=self.required_consumer_fields,
             )
 
-            for (s_key, c_key, (candidate_supplier_locations, candidate_consumer_locations)), edge_group in tqdm(
+            for (
+                s_key,
+                c_key,
+                (candidate_supplier_locations, candidate_consumer_locations),
+            ), edge_group in tqdm(
                 grouped_edges.items(), desc="Processing dynamic groups (pass 2)"
             ):
                 new_cf, matched_cf_obj = compute_cf_memoized(
-                    s_key, c_key, candidate_supplier_locations, candidate_consumer_locations
+                    s_key,
+                    c_key,
+                    candidate_supplier_locations,
+                    candidate_consumer_locations,
                 )
 
                 if new_cf:
@@ -1264,42 +1283,50 @@ class EdgeLCIA:
                     "location"
                 )
 
-                edges_index[(consumer_loc, supplier_loc)].append((supplier_idx, consumer_idx))
+                edges_index[(consumer_loc, supplier_loc)].append(
+                    (supplier_idx, consumer_idx)
+                )
 
             prefiltered_groups = defaultdict(list)
             remaining_edges = []
 
             for (consumer_location, supplier_location), edges in edges_index.items():
                 if any(
-                        x in ("RoW", "RoE")
-                        for x in (consumer_location, supplier_location)
+                    x in ("RoW", "RoE") for x in (consumer_location, supplier_location)
                 ):
                     continue
 
                 # 🔁 Use the shared utility function to get subregions
                 if supplier_location is None:
-                    candidate_suppliers_locations = ["__ANY__",]
+                    candidate_suppliers_locations = [
+                        "__ANY__",
+                    ]
                 else:
                     candidate_suppliers_locations = resolve_candidate_locations(
                         geo=self.geo,
                         location=supplier_location,
                         weights=frozenset(k for k, v in self.weights.items()),
                         containing=False,
-                        supplier=True
+                        supplier=True,
                     )
 
                 if consumer_location is None:
-                    candidate_consumer_locations = ["__ANY__",]
+                    candidate_consumer_locations = [
+                        "__ANY__",
+                    ]
                 else:
                     candidate_consumer_locations = resolve_candidate_locations(
                         geo=self.geo,
                         location=consumer_location,
                         weights=frozenset(k for k, v in self.weights.items()),
                         containing=False,
-                        supplier=False
+                        supplier=False,
                     )
 
-                if len(candidate_suppliers_locations) == 0 and len(candidate_consumer_locations) == 0:
+                if (
+                    len(candidate_suppliers_locations) == 0
+                    and len(candidate_consumer_locations) == 0
+                ):
                     # neither the supplier or consumer locations are composite locations
                     continue
 
@@ -1392,7 +1419,11 @@ class EdgeLCIA:
                 required_consumer_fields=self.required_consumer_fields,
             )
 
-            for (s_key, c_key, (candidate_suppliers, candidate_consumers)), edge_group in tqdm(
+            for (
+                s_key,
+                c_key,
+                (candidate_suppliers, candidate_consumers),
+            ), edge_group in tqdm(
                 grouped_edges.items(), desc="Processing contained groups (pass 2)"
             ):
                 new_cf, matched_cf_obj = compute_cf_memoized(
@@ -1487,20 +1518,24 @@ class EdgeLCIA:
                     "location"
                 )
 
-                edges_index[(consumer_loc, supplier_loc)].append((supplier_idx, consumer_idx))
+                edges_index[(consumer_loc, supplier_loc)].append(
+                    (supplier_idx, consumer_idx)
+                )
 
             prefiltered_groups = defaultdict(list)
             remaining_edges = []
 
             for (consumer_location, supplier_location), edges in edges_index.items():
                 if any(
-                        x in ("RoW", "RoE", "GLO")
-                        for x in (consumer_location, supplier_location)
+                    x in ("RoW", "RoE", "GLO")
+                    for x in (consumer_location, supplier_location)
                 ):
                     continue
 
                 if supplier_location is None:
-                    candidate_suppliers_locations = ["__ANY__",]
+                    candidate_suppliers_locations = [
+                        "__ANY__",
+                    ]
                 else:
                     candidate_suppliers_locations = global_locations
 
